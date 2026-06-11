@@ -1,0 +1,28 @@
+{
+  "matrix": [
+    {
+      "completed": true,
+      "phase": "after_claim",
+      "probe_effect_count": 1,
+      "stuck_tasks": 0
+    },
+    {
+      "completed": true,
+      "phase": "mid_execute",
+      "probe_effect_count": 1,
+      "stuck_tasks": 0
+    },
+    {
+      "completed": true,
+      "phase": "pre_barrier",
+      "probe_effect_count": 1,
+      "stuck_tasks": 0
+    },
+    {
+      "completed": true,
+      "phase": "post_barrier_pre_complete",
+      "probe_effect_count": 1,
+      "stuck_tasks": 0
+    }
+  ]
+}
