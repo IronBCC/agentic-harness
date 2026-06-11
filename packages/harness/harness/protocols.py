@@ -4,18 +4,10 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from harness.types import CallCtx, Event, LLMEvent, LLMRequest, NodeTask
-
-
-class RunInit(Protocol):
-    """Run creation payload marker."""
-
-
-class RunState(Protocol):
-    """Replayed run state marker."""
+from harness.types import CallCtx, Event, LLMEvent, LLMRequest, NodeTask, RunInit, RunState
 
 
 class TaskTerminal(Protocol):
@@ -94,6 +86,7 @@ class RedactionCfg(Protocol):
     """Redaction configuration marker."""
 
 
+@runtime_checkable
 class DurabilityBackend(Protocol):
     async def create_run(self, run: RunInit) -> None: ...
     async def append(self, run_id: UUID, events: list[Event]) -> None: ...
@@ -144,4 +137,3 @@ class ToolProvider(Protocol):
 class PolicyEngine(Protocol):
     async def check(self, call: ToolCall, ctx: CallCtx) -> Decision: ...
     def redact(self, fact: FactIn, cfg: RedactionCfg) -> FactIn: ...
-

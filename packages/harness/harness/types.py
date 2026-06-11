@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 from uuid import UUID
@@ -101,6 +102,34 @@ class CallCtx(BaseModel):
     root_run_id: RunId
 
 
+RunStatus = Literal["running", "waiting", "wrapping_up", "succeeded", "failed", "cancelled"]
+RequestClass = Literal["interactive", "background"]
+
+
+class RunInit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: RunId
+    root_run_id: RunId
+    tenant_id: Tenant
+    principal: Principal
+    spec_id: str
+    spec_version: int
+    request_class: RequestClass
+    status: RunStatus = "running"
+    parent_run_id: RunId | None = None
+    depth: int = 0
+    goal_hash: str | None = None
+    budget: dict[str, object] = Field(default_factory=dict)
+    result: dict[str, object] | None = None
+
+
+class RunState(RunInit):
+    events: list[Event] = Field(default_factory=list)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 class CassetteMode(StrEnum):
     record = "record"
     replay = "replay"
@@ -140,4 +169,3 @@ class LLMEvent(BaseModel):
 
     type: Literal["token", "tool_call", "usage", "done"]
     data: dict[str, object] = Field(default_factory=dict)
-
