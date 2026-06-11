@@ -15,3 +15,12 @@ prompt_cache = false
 streaming = true
 price_input_per_million = 0.0
 price_output_per_million = 0.0
+
+[anthropic]
+tool_calls = true
+guided_decoding = false
+max_context = 200000
+prompt_cache = true
+streaming = true
+price_input_per_million = 0.0
+price_output_per_million = 0.0

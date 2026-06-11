@@ -51,6 +51,26 @@ def test_capabilities_come_from_static_registry_and_binding_overrides() -> None:
     assert caps.price_output_per_million == 0.2
 
 
+def test_anthropic_capabilities_are_registered() -> None:
+    from harness.models.gateway import ModelGateway
+
+    gateway = ModelGateway(adapters={"anthropic": DummyAdapter()})
+
+    caps = gateway.capabilities(
+        ModelBinding(
+            name="claude",
+            provider="anthropic",
+            model="claude-opus-4-8",
+        )
+    )
+
+    assert caps.tool_calls is True
+    assert caps.guided_decoding is False
+    assert caps.max_context >= 200_000
+    assert caps.prompt_cache is True
+    assert caps.streaming is True
+
+
 @pytest.mark.asyncio
 async def test_gateway_dispatches_adapter_and_emits_metering_event() -> None:
     from harness.models.gateway import ModelGateway
