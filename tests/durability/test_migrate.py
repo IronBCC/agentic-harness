@@ -83,7 +83,7 @@ async def test_apply_creates_core_schema_and_is_idempotent(pg: str) -> None:
 
     conn = await asyncpg.connect(pg)
     try:
-        assert first == [1, 2, 3]
+        assert first == [1, 2, 3, 4]
         assert second == []
         for table in (
             "schema_migrations",
@@ -92,6 +92,7 @@ async def test_apply_creates_core_schema_and_is_idempotent(pg: str) -> None:
             "node_tasks",
             "tool_registry",
             "memo_cache",
+            "cassettes",
         ):
             assert await _table_exists(conn, table)
         assert await _constraint_exists(conn, "run_events", ["run_id", "idempotency_key"])
