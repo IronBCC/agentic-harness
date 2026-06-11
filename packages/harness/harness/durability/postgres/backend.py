@@ -13,7 +13,7 @@ import asyncpg
 from harness.durability.postgres.eventlog import EventLog
 from harness.durability.postgres.queue import Queue
 from harness.errors import ValidationFailed
-from harness.types import Event, NodeTask, Principal, RunInit, RunState, RunStatus
+from harness.types import Event, NodeTask, NodeTaskSnapshot, Principal, RunInit, RunState, RunStatus
 
 
 class PostgresBackend:
@@ -135,6 +135,60 @@ class PostgresBackend:
     async def claim(self, worker: str, n: int) -> list[NodeTask]:
         """Claim pending tasks."""
         return await self._queue.claim(worker, n)
+
+    async def enqueue_task(
+        self,
+        *,
+        task_id: UUID,
+        run_id: UUID,
+        node_id: str,
+        input: dict[str, object] | None = None,
+        priority: int = 0,
+        attempt: int = 0,
+    ) -> None:
+        """Insert a pending task for a run node."""
+        async with self._connection() as conn:
+            await conn.execute(
+                """
+                INSERT INTO node_tasks (
+                  task_id, run_id, node_id, state, attempt, priority, input
+                )
+                VALUES ($1, $2, $3, 'pending', $4, $5, $6::jsonb)
+                """,
+                task_id,
+                run_id,
+                node_id,
+                attempt,
+                priority,
+                json.dumps(input or {}),
+            )
+
+    async def list_tasks(self, run_id: UUID) -> list[NodeTaskSnapshot]:
+        """Return persisted task snapshots for a run."""
+        async with self._connection() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT task_id, run_id, node_id, state, attempt, input,
+                       lease_owner, lease_expires_at
+                FROM node_tasks
+                WHERE run_id = $1
+                ORDER BY created_at ASC, task_id ASC
+                """,
+                run_id,
+            )
+        return [
+            NodeTaskSnapshot(
+                task_id=row["task_id"],
+                run_id=row["run_id"],
+                node_id=row["node_id"],
+                state=row["state"],
+                attempt=row["attempt"],
+                input=_json_dict(row["input"]),
+                lease_owner=row["lease_owner"],
+                lease_expires_at=row["lease_expires_at"],
+            )
+            for row in rows
+        ]
 
     async def heartbeat(self, worker: str, task_ids: list[UUID]) -> None:
         """Extend task leases."""

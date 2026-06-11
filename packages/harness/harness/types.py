@@ -85,6 +85,12 @@ class NodeTask(BaseModel):
     input: dict[str, object] = Field(default_factory=dict)
 
 
+class NodeTaskSnapshot(NodeTask):
+    state: Literal["pending", "claimed", "waiting", "done", "failed"]
+    lease_owner: str | None = None
+    lease_expires_at: datetime | None = None
+
+
 class Principal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
