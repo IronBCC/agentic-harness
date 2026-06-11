@@ -10,6 +10,8 @@ from uuid import UUID
 
 from harness.dsl.models import AgentSpec, NodeSpec
 from harness.durability.postgres.backend import PostgresBackend
+from harness.engine.retry import RetryDecision, plan_infra_retry, plan_schema_violation
+from harness.errors import InfraRetryable, SchemaViolation
 from harness.types import (
     Event,
     EventKind,
@@ -18,7 +20,7 @@ from harness.types import (
     RunInit,
     YieldStatus,
 )
-from harness.util import IdGen
+from harness.util import Clock, IdGen, SystemClock
 
 NodeRunner = Callable[[NodeSpec, NodeTask], Awaitable[NodeYield]]
 
@@ -32,6 +34,7 @@ class Executor:
     node_runner: NodeRunner
     idgen: IdGen
     worker: str
+    clock: Clock = field(default_factory=SystemClock)
     batch_size: int = 20
     _locks: dict[UUID, asyncio.Lock] = field(default_factory=lambda: defaultdict(asyncio.Lock))
 
@@ -66,9 +69,16 @@ class Executor:
             node_id=node.node_id,
             kind=EventKind.node_started,
             payload={"attempt": task.attempt},
-            idempotency_key=f"{task.task_id}:started",
+            idempotency_key=f"{task.task_id}:attempt:{task.attempt}:started",
         )
-        node_yield = await self.node_runner(node, task)
+        try:
+            node_yield = await self.node_runner(node, task)
+        except InfraRetryable:
+            await self._apply_retry_decision(task, plan_infra_retry(node, task, self.clock))
+            return
+        except SchemaViolation:
+            await self._apply_retry_decision(task, plan_schema_violation(node, task, self.clock))
+            return
         await self._append_event(
             task.run_id,
             node_id=node.node_id,
@@ -79,6 +89,33 @@ class Executor:
         await self.backend.complete(task.task_id, terminal=node_yield.model_dump(mode="json"))
         await self._schedule_ready_successors(task.run_id)
         await self._finish_run_if_complete(task.run_id, node.node_id, node_yield)
+
+    async def _apply_retry_decision(self, task: NodeTask, decision: RetryDecision) -> None:
+        if decision.kind == "reschedule":
+            if decision.available_at is None or decision.next_attempt is None:
+                raise SchemaViolation("retry decision missing reschedule fields")
+            await self.backend.reschedule(
+                task.task_id,
+                decision.available_at,
+                decision.next_attempt,
+                decision.next_input,
+            )
+            return
+
+        if decision.node_yield is None:
+            raise SchemaViolation("retry decision missing terminal yield")
+
+        await self._append_event(
+            task.run_id,
+            node_id=task.node_id,
+            kind=EventKind.yielded,
+            payload=decision.node_yield.model_dump(mode="json", by_alias=True, exclude_none=True),
+            idempotency_key=f"{task.task_id}:yielded",
+        )
+        await self.backend.complete(
+            task.task_id,
+            terminal=decision.node_yield.model_dump(mode="json"),
+        )
 
     async def _schedule_ready_successors(self, run_id: UUID) -> None:
         async with self._locks[run_id]:
@@ -180,4 +217,3 @@ class Executor:
             if node.node_id == node_id:
                 return node
         raise KeyError(node_id)
-

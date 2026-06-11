@@ -92,7 +92,13 @@ class Queue:
                 json.dumps({"terminal": terminal}),
             )
 
-    async def reschedule(self, task_id: UUID, at: datetime, attempt: int) -> None:
+    async def reschedule(
+        self,
+        task_id: UUID,
+        at: datetime,
+        attempt: int,
+        input: dict[str, object] | None = None,
+    ) -> None:
         """Return a task to pending at a future availability time."""
         async with self._connection() as conn:
             await conn.execute(
@@ -101,6 +107,7 @@ class Queue:
                 SET state = 'pending',
                     attempt = $2,
                     available_at = $3,
+                    input = CASE WHEN $4::jsonb IS NULL THEN input ELSE $4::jsonb END,
                     lease_owner = NULL,
                     lease_expires_at = NULL
                 WHERE task_id = $1
@@ -108,6 +115,7 @@ class Queue:
                 task_id,
                 attempt,
                 at,
+                json.dumps(input) if input is not None else None,
             )
             await conn.execute("SELECT pg_notify('tasks', $1)", str(task_id))
 

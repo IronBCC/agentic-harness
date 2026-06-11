@@ -198,9 +198,15 @@ class PostgresBackend:
         """Complete a claimed task."""
         await self._queue.complete(task_id, terminal)
 
-    async def reschedule(self, task_id: UUID, at: datetime, attempt: int) -> None:
+    async def reschedule(
+        self,
+        task_id: UUID,
+        at: datetime,
+        attempt: int,
+        input: dict[str, object] | None = None,
+    ) -> None:
         """Reschedule a task."""
-        await self._queue.reschedule(task_id, at, attempt)
+        await self._queue.reschedule(task_id, at, attempt, input)
 
     async def task_state(self, task_id: UUID) -> str | None:
         """Return a task state for tests and diagnostics."""

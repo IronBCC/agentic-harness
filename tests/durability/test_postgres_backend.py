@@ -64,7 +64,7 @@ async def test_postgres_backend_conforms_to_durability_protocol(pg: str) -> None
     assert list(signature(backend.claim).parameters) == ["worker", "n"]
     assert list(signature(backend.heartbeat).parameters) == ["worker", "task_ids"]
     assert list(signature(backend.complete).parameters) == ["task_id", "terminal"]
-    assert list(signature(backend.reschedule).parameters) == ["task_id", "at", "attempt"]
+    assert list(signature(backend.reschedule).parameters) == ["task_id", "at", "attempt", "input"]
 
 
 @pytest.mark.asyncio
@@ -108,6 +108,13 @@ async def test_postgres_backend_facade_appends_events_and_manages_tasks(pg: str)
     await _insert_task(pg, task_id, run_id)
 
     claimed = await backend.claim("worker-a", n=1)
+    await backend.reschedule(
+        task_id,
+        datetime.now(UTC) - timedelta(seconds=1),
+        attempt=1,
+        input={"retry": True},
+    )
+    reclaimed = await backend.claim("worker-b", n=1)
     await backend.append(
         run_id,
         [
@@ -125,6 +132,8 @@ async def test_postgres_backend_facade_appends_events_and_manages_tasks(pg: str)
     loaded = await backend.load(run_id)
 
     assert [task.task_id for task in claimed] == [task_id]
+    assert [(task.task_id, task.attempt, task.input) for task in reclaimed] == [
+        (task_id, 1, {"retry": True})
+    ]
     assert [event.idempotency_key for event in loaded.events] == ["facade-start"]
     assert await backend.task_state(task_id) == "done"
-
