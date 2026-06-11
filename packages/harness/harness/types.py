@@ -175,3 +175,35 @@ class LLMEvent(BaseModel):
 
     type: Literal["token", "tool_call", "usage", "done"]
     data: dict[str, object] = Field(default_factory=dict)
+
+
+class ToolCall(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tool_id: str
+    args: dict[str, object] = Field(default_factory=dict)
+
+
+class ToolResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    output: dict[str, object]
+    artifact_hint: str | None = None
+
+
+class ToolRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: Tenant
+    tool_id: str
+    name: str
+    description: str
+    input_schema: dict[str, object]
+    source: str
+    side_effect: Literal["pure", "read", "write"]
+    idempotency: Literal["keyed", "none"] = "none"
+    freshness: Literal["pure", "session", "volatile"]
+    auth_mode: Literal["service", "user_passthrough"]
+    requires_approval: bool = False
+    index_card: str
+    metadata: dict[str, object] = Field(default_factory=dict)
