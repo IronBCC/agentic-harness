@@ -54,6 +54,24 @@ async def _constraint_exists(conn: asyncpg.Connection, table: str, columns: list
     )
 
 
+async def _column_exists(conn: asyncpg.Connection, table: str, column: str) -> bool:
+    return bool(
+        await conn.fetchval(
+            """
+            SELECT EXISTS (
+              SELECT 1
+              FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = $1
+                AND column_name = $2
+            )
+            """,
+            table,
+            column,
+        )
+    )
+
+
 @pytest.mark.asyncio
 async def test_apply_creates_core_schema_and_is_idempotent(pg: str) -> None:
     from harness.durability.postgres.migrate import apply
@@ -65,11 +83,12 @@ async def test_apply_creates_core_schema_and_is_idempotent(pg: str) -> None:
 
     conn = await asyncpg.connect(pg)
     try:
-        assert first == [1]
+        assert first == [1, 2]
         assert second == []
         for table in ("schema_migrations", "runs", "run_events", "node_tasks"):
             assert await _table_exists(conn, table)
         assert await _constraint_exists(conn, "run_events", ["run_id", "idempotency_key"])
         assert await _constraint_exists(conn, "run_events", ["run_id", "seq"])
+        assert await _column_exists(conn, "run_events", "barrier")
     finally:
         await conn.close()

@@ -105,9 +105,9 @@ class EventLog:
                     await conn.executemany(
                         """
                         INSERT INTO run_events (
-                          run_id, seq, node_id, kind, payload, idempotency_key
+                          run_id, seq, node_id, kind, payload, idempotency_key, barrier
                         )
-                        VALUES ($1, $2, $3, $4, $5, $6)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
                         """,
                         tuple(
                             (
@@ -117,6 +117,7 @@ class EventLog:
                                 event.kind.value,
                                 json.dumps(event.payload),
                                 event.idempotency_key,
+                                event.barrier,
                             )
                             for event in events
                         ),
@@ -129,7 +130,7 @@ class EventLog:
         async with self._connection() as conn:
             rows = await conn.fetch(
                 """
-                SELECT seq, node_id, kind, payload, idempotency_key
+                SELECT seq, node_id, kind, payload, idempotency_key, barrier
                 FROM run_events
                 WHERE run_id = $1
                 ORDER BY seq ASC
@@ -144,6 +145,7 @@ class EventLog:
                 kind=EventKind(row["kind"]),
                 payload=json.loads(row["payload"]),
                 idempotency_key=row["idempotency_key"],
+                barrier=row["barrier"],
             )
             for row in rows
         ]
