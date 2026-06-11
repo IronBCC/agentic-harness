@@ -38,3 +38,6 @@ M0 durability validation is green. The latest local transition benchmark measure
 `p95=2.34ms` for the pooled Postgres path; see `docs/M0-REPORT.md`.
 
 Next planned ticket: M1-03 DSL validator v0.
+
+Progress/observability design for the future API lives in
+`docs/superpowers/specs/2026-06-11-run-progress-observability-design.md`.
