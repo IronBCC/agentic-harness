@@ -36,6 +36,10 @@ class ToolRegistry:
         self._lock = asyncio.Lock()
         self._inflight: dict[str, asyncio.Task[ToolResult]] = {}
 
+    def register_executor(self, source: str, executor: ToolExecutor) -> None:
+        """Register or replace a source executor."""
+        self._executors[source] = executor
+
     async def upsert_tool(self, record: ToolRecord) -> None:
         async with self._connection() as conn:
             await conn.execute(
