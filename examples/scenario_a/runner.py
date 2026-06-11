@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import asyncpg
 from harness.dsl.models import AgentSpec, NodeSpec
 from harness.durability.postgres.backend import PostgresBackend
 from harness.engine.executor import Executor
@@ -58,8 +59,9 @@ def build_executor(
     dsn: str,
     *,
     run_id: UUID,
+    pool: asyncpg.Pool | None = None,
 ) -> tuple[Executor, PostgresBackend, RunInit]:
-    backend = PostgresBackend(dsn, background_flush=False)
+    backend = PostgresBackend(dsn, background_flush=False, pool=pool)
     spec = build_spec()
     executor = Executor(
         backend=backend,
@@ -82,8 +84,13 @@ def build_executor(
     return executor, backend, run
 
 
-async def run_replay(dsn: str, *, run_id: UUID) -> tuple[RunState, list[dict[str, object]]]:
-    executor, backend, run = build_executor(dsn, run_id=run_id)
+async def run_replay(
+    dsn: str,
+    *,
+    run_id: UUID,
+    pool: asyncpg.Pool | None = None,
+) -> tuple[RunState, list[dict[str, object]]]:
+    executor, backend, run = build_executor(dsn, run_id=run_id, pool=pool)
     await executor.seed_run(run, input={"case": "scenario-a"})
     await executor.run_until_idle()
     loaded = await backend.load(run_id)

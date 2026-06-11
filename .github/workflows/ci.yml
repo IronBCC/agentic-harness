@@ -14,4 +14,23 @@ jobs:
       - run: uv run ruff check .
       - run: uv run mypy --strict packages/harness/harness
       - run: uv run pytest -m "not live and not chaos and not bench and not soak"
-
+  bench:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: harness
+          POSTGRES_PASSWORD: harness
+          POSTGRES_DB: harness
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: HARNESS_TEST_DSN=postgresql://harness:harness@localhost:55432/harness uv run pytest -m bench
